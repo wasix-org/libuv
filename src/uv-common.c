@@ -289,7 +289,10 @@ int uv_ip6_addr(const char* ip, int port, struct sockaddr_in6* addr) {
 #ifdef _WIN32
     addr->sin6_scope_id = atoi(zone_index);
 #else
+// TODO: missing wasix entrypoint
+#ifndef __wasi__
     addr->sin6_scope_id = if_nametoindex(zone_index);
+#endif
 #endif
   }
 
