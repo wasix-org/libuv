@@ -399,14 +399,24 @@ static int uv__loop_alive(const uv_loop_t* loop) {
 
 
 static int uv__backend_timeout(const uv_loop_t* loop) {
+  int timeout;
+
   if (loop->stop_flag == 0 &&
       /* uv__loop_alive(loop) && */
       (uv__has_active_handles(loop) || uv__has_active_reqs(loop)) &&
       uv__queue_empty(&loop->pending_queue) &&
       uv__queue_empty(&loop->idle_handles) &&
       (loop->flags & UV_LOOP_REAP_CHILDREN) == 0 &&
-      loop->closing_handles == NULL)
-    return uv__next_timeout(loop);
+      loop->closing_handles == NULL) {
+    timeout = uv__next_timeout(loop);
+#if defined(__wasi__)
+    if (!uv__queue_empty(&loop->process_handles) &&
+        (timeout == -1 || timeout > 10)) {
+      timeout = 10;
+    }
+#endif
+    return timeout;
+  }
   return 0;
 }
 
@@ -458,6 +468,11 @@ int uv_run(uv_loop_t* loop, uv_run_mode mode) {
     uv__metrics_inc_loop_count(loop);
 
     uv__io_poll(loop, timeout);
+
+#if defined(__wasi__)
+    if (!uv__queue_empty(&loop->process_handles))
+      uv__wait_children(loop);
+#endif
 
     /* Process immediate callbacks (e.g. write_cb) a small fixed number of
      * times to avoid loop starvation.*/
