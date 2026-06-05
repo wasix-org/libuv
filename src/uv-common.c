@@ -443,6 +443,10 @@ int uv_udp_connect(uv_udp_t* handle, const struct sockaddr* addr) {
 
 
 int uv__udp_is_connected(uv_udp_t* handle) {
+#if defined(__wasi__)
+  return handle->type == UV_UDP &&
+         (handle->flags & UV_HANDLE_UDP_CONNECTED) != 0;
+#else
   struct sockaddr_storage addr;
   int addrlen;
   if (handle->type != UV_UDP)
@@ -453,6 +457,7 @@ int uv__udp_is_connected(uv_udp_t* handle) {
     return 0;
 
   return addrlen > 0;
+#endif
 }
 
 
