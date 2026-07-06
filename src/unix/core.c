@@ -2102,6 +2102,7 @@ int uv__sock_reuseport(int fd) {
   if (setsockopt(fd, SOL_SOCKET, SO_REUSEPORT_LB, &on, sizeof(on)))
     return UV__ERR(errno);
 #elif (defined(__linux__) || \
+      defined(__wasi__) || \
       defined(_AIX73) || \
       (defined(__DragonFly__) && __DragonFly_version >= 300600) || \
       (defined(UV__SOLARIS_11_4) && UV__SOLARIS_11_4)) && \
@@ -2110,6 +2111,11 @@ int uv__sock_reuseport(int fd) {
    * evenly across all of the threads (or processes) that are blocked in
    * accept() on the same port. As with TCP, SO_REUSEPORT distributes datagrams
    * evenly across all of the receiving threads (or process).
+   *
+   * On WASIX, setsockopt(SO_REUSEPORT) reaches the runtime via
+   * sock_set_opt_flag and wasmer applies it to the underlying host socket
+   * before bind, so the load-balancing semantics are the host kernel's
+   * (Linux in practice).
    *
    * DragonFlyBSD 3.6.0 extended SO_REUSEPORT to distribute workload to
    * available sockets, which made it the equivalent of Linux's SO_REUSEPORT.
