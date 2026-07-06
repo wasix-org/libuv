@@ -1092,9 +1092,14 @@ static void uv__read(uv_stream_t* stream) {
       }
       while (nread < 0 && errno == EINTR);
 #else
-      /* WASI does not support msghdr. */
-      nread = -1;
-      errno = ENOSYS;
+      /* WASIX has no msghdr/SCM_RIGHTS, so no descriptor can accompany the
+       * data (uv__try_write refuses send_handle with UV_ENOSYS on both
+       * ends). A plain read preserves the IPC byte stream, which is all
+       * that e.g. child_process.fork/process.send channels need. */
+      do {
+        nread = read(uv__stream_fd(stream), buf.base, buf.len);
+      }
+      while (nread < 0 && errno == EINTR);
 #endif  /* !__wasi__ */
     }
 
