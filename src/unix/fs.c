@@ -46,6 +46,10 @@
 #include <fcntl.h>
 #include <poll.h>
 
+#if defined(__wasi__)
+# include <wasi/api.h>
+#endif
+
 #if defined(__linux__)
 # include <sys/sendfile.h>
 #endif
@@ -364,16 +368,51 @@ clobber:
 }
 
 
+static int uv__fs_open_with_directory_retry(const char* path,
+                                             int flags,
+                                             int mode) {
+  int r;
+
+#if defined(__wasi__)
+  /* POSIX defines O_RDONLY as zero, so libuv callers may pass a literal zero.
+   * WASIX uses an explicit access-mode bit and requires it to be present. */
+  if ((flags & (O_RDONLY | O_WRONLY | O_RDWR)) == 0)
+    flags |= O_RDONLY;
+#endif
+
+  r = open(path, flags, mode);
+
+#if defined(__wasi__)
+  /* WASIX requires O_DIRECTORY when opening a directory, while POSIX allows
+   * open(path, O_RDONLY). Preserve libuv's POSIX behavior for callers such as
+   * uvwasi that preopen directories without the platform-specific flag. */
+  if (r < 0 && errno == EINVAL && (flags & O_DIRECTORY) == 0) {
+    int open_errno;
+    struct stat st;
+
+    open_errno = errno;
+    if (stat(path, &st) == 0 && S_ISDIR(st.st_mode))
+      return open(path, flags | O_DIRECTORY, mode);
+    errno = open_errno;
+  }
+#endif
+
+  return r;
+}
+
+
 static ssize_t uv__fs_open(uv_fs_t* req) {
 #ifdef O_CLOEXEC
-  return open(req->path, req->flags | O_CLOEXEC, req->mode);
+  return uv__fs_open_with_directory_retry(req->path,
+                                           req->flags | O_CLOEXEC,
+                                           req->mode);
 #else  /* O_CLOEXEC */
   int r;
 
   if (req->cb != NULL)
     uv_rwlock_rdlock(&req->loop->cloexec_lock);
 
-  r = open(req->path, req->flags, req->mode);
+  r = uv__fs_open_with_directory_retry(req->path, req->flags, req->mode);
 
   /* In case of failure `uv__cloexec` will leave error in `errno`,
    * so it is enough to just set `r` to `-1`.
@@ -1614,8 +1653,47 @@ static int uv__fs_fstat(int fd, uv_stat_t *buf) {
     return ret;
 
   ret = uv__fstat(fd, &pbuf);
-  if (ret == 0)
+  if (ret == 0) {
     uv__to_stat(&pbuf, buf);
+
+#if defined(__wasi__)
+    /* fd_filestat_get may not carry a POSIX mode for virtual descriptors such
+     * as child-process pipes. fd_fdstat_get still exposes their WASI type. */
+    if ((buf->st_mode & S_IFMT) == 0) {
+      __wasi_fdstat_t fdstat;
+
+      if (__wasi_fd_fdstat_get(fd, &fdstat) == 0) {
+        switch (fdstat.fs_filetype) {
+          case __WASI_FILETYPE_BLOCK_DEVICE:
+            buf->st_mode |= S_IFBLK;
+            break;
+          case __WASI_FILETYPE_CHARACTER_DEVICE:
+            buf->st_mode |= S_IFCHR;
+            break;
+          case __WASI_FILETYPE_DIRECTORY:
+            buf->st_mode |= S_IFDIR;
+            break;
+          case __WASI_FILETYPE_REGULAR_FILE:
+            buf->st_mode |= S_IFREG;
+            break;
+          case __WASI_FILETYPE_SOCKET_DGRAM:
+          case __WASI_FILETYPE_SOCKET_STREAM:
+# if defined(S_IFSOCK)
+            buf->st_mode |= S_IFSOCK;
+# else
+            buf->st_mode |= S_IFIFO;
+# endif
+            break;
+          case __WASI_FILETYPE_SYMBOLIC_LINK:
+            buf->st_mode |= S_IFLNK;
+            break;
+          default:
+            break;
+        }
+      }
+    }
+#endif
+  }
 
   return ret;
 }
