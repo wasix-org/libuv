@@ -1349,6 +1349,17 @@ static int uv__check_before_write(uv_stream_t* stream,
        See https://github.com/mirror/newlib-cygwin/blob/86fc4bf0/winsup/cygwin/fhandler_socket.cc#L1736-L1743 */
     return UV_ENOSYS;
 #endif
+
+#if defined(__wasi__)
+    /* WASI has no msghdr/SCM_RIGHTS, so uv__try_write() cannot attach the
+     * descriptor and refuses the write. Reject here instead: uv_write2()
+     * reports this synchronously, whereas a failure raised from the queued
+     * write is delivered as a completion status that callers such as Node's
+     * IPC channel discard, leaving both peers waiting for a message that can
+     * never arrive. The byte stream itself keeps working; only descriptor
+     * passing is unsupported. */
+    return UV_ENOSYS;
+#endif
   }
 
   return 0;
