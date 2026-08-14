@@ -1700,16 +1700,12 @@ static void uv__fs_work(struct uv__work* w) {
     switch (req->fs_type) {
     X(ACCESS, access(req->path, req->flags));
     X(CHMOD, chmod(req->path, req->mode));
-#ifndef __wasi__
     X(CHOWN, chown(req->path, req->uid, req->gid));
-#endif
     X(CLOSE, uv__fs_close(req->file));
     X(COPYFILE, uv__fs_copyfile(req));
     X(FCHMOD, fchmod(req->file, req->mode));
-#ifndef __wasi__
     X(FCHOWN, fchown(req->file, req->uid, req->gid));
     X(LCHOWN, lchown(req->path, req->uid, req->gid));
-#endif
     X(FDATASYNC, uv__fs_fdatasync(req));
     X(FSTAT, uv__fs_fstat(req->file, &req->statbuf));
     X(FSYNC, uv__fs_fsync(req));
