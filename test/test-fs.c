@@ -883,7 +883,7 @@ static void check_utime(const char* path,
      */
     if (s->st_mtim.tv_nsec == 0) {
       if (is_win32)
-        ASSERT_DOUBLE_EQ(mtime, (long) atime);
+        ASSERT_DOUBLE_EQ(mtime, (long) mtime);
       if (mtime > 0 || (long) mtime == mtime)
         ASSERT_EQ(s->st_mtim.tv_sec, (long) mtime);
       ASSERT_GE(s->st_mtim.tv_sec, (long) mtime - 1);
@@ -2827,6 +2827,55 @@ TEST_IMPL(fs_utime) {
 }
 
 
+TEST_IMPL(fs_utime_directory) {
+  const char* path = "test_directory";
+  utime_check_t checkme;
+  uv_fs_t req;
+
+  loop = uv_default_loop();
+  rmdir(path);
+  ASSERT_OK(uv_fs_mkdir(NULL, &req, path, 0700, NULL));
+  uv_fs_req_cleanup(&req);
+
+  /* Lock heartbeats update directories, not regular files. Distinct times
+   * catch backends that update the wrong field or the parent directory.
+   */
+  checkme.path = path;
+  checkme.atime = 1700000000.125;
+  checkme.mtime = 1700000100.25;
+  ASSERT_OK(uv_fs_utime(NULL,
+                       &req,
+                       path,
+                       checkme.atime,
+                       checkme.mtime,
+                       NULL));
+  uv_fs_req_cleanup(&req);
+  check_utime(path, checkme.atime, checkme.mtime, 0);
+
+  checkme.atime += 1;
+  checkme.mtime += 2;
+  utime_req.data = &checkme;
+  ASSERT_OK(uv_fs_utime(loop,
+                       &utime_req,
+                       path,
+                       checkme.atime,
+                       checkme.mtime,
+                       utime_cb));
+  ASSERT_OK(uv_run(loop, UV_RUN_DEFAULT));
+  ASSERT_EQ(1, utime_cb_count);
+
+  ASSERT_OK(uv_fs_rmdir(NULL, &req, path, NULL));
+  uv_fs_req_cleanup(&req);
+  ASSERT_EQ(UV_ENOENT,
+            uv_fs_utime(NULL, &req, path, 1700000000, 1700000100, NULL));
+  ASSERT_EQ(UV_ENOENT, req.result);
+  uv_fs_req_cleanup(&req);
+
+  MAKE_VALGRIND_HAPPY(loop);
+  return 0;
+}
+
+
 TEST_IMPL(fs_utime_round) {
   const char path[] = "test_file";
   double atime;
@@ -2923,7 +2972,8 @@ TEST_IMPL(fs_futime) {
   uv_fs_req_cleanup(&req);
   uv_fs_close(loop, &req, r, NULL);
 
-  atime = mtime = 400497753.25; /* 1982-09-10 11:22:33.25 */
+  atime = 400497753.25;
+  mtime = 400497853.5; /* 1982-09-10 11:22:33.25 */
 
   r = uv_fs_open(NULL, &req, path, UV_FS_O_RDWR, 0, NULL);
   ASSERT_GE(r, 0);
@@ -2977,7 +3027,8 @@ TEST_IMPL(fs_futime) {
   uv_fs_req_cleanup(&req);
   check_utime(path, atime, UV_FS_UTIME_NOW, /* test_lutime */ 0);
 
-  atime = mtime = 1291404900; /* 2010-12-03 20:35:00 - mees <3 */
+  atime = 1291404900;
+  mtime = 1291405000; /* 2010-12-03 20:35:00 - mees <3 */
 
   checkme.atime = atime;
   checkme.mtime = mtime;
@@ -2989,6 +3040,13 @@ TEST_IMPL(fs_futime) {
   ASSERT_OK(r);
   uv_run(loop, UV_RUN_DEFAULT);
   ASSERT_EQ(1, futime_cb_count);
+
+  /* Invalid descriptors must fail rather than silently skip the update. */
+  ASSERT_OK(uv_fs_close(NULL, &req, file, NULL));
+  uv_fs_req_cleanup(&req);
+  ASSERT_EQ(UV_EBADF, uv_fs_futime(NULL, &req, file, atime, mtime, NULL));
+  ASSERT_EQ(UV_EBADF, req.result);
+  uv_fs_req_cleanup(&req);
 
   /* Cleanup. */
   unlink(path);

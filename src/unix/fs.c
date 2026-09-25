@@ -211,7 +211,8 @@ static ssize_t uv__fs_fdatasync(uv_fs_t* req) {
     || defined(__NetBSD__)                                                    \
     || defined(__OpenBSD__)                                                   \
     || defined(__linux__)                                                     \
-    || defined(__sun)
+    || defined(__sun)                                                         \
+    || defined(__wasi__)
 static struct timespec uv__fs_to_timespec(double time) {
   struct timespec ts;
 
@@ -248,7 +249,8 @@ static ssize_t uv__fs_futime(uv_fs_t* req) {
     || defined(__NetBSD__)                                                    \
     || defined(__OpenBSD__)                                                   \
     || defined(__linux__)                                                     \
-    || defined(__sun)
+    || defined(__sun)                                                         \
+    || defined(__wasi__)
   struct timespec ts[2];
   ts[0] = uv__fs_to_timespec(req->atime);
   ts[1] = uv__fs_to_timespec(req->mtime);
@@ -1149,7 +1151,8 @@ static ssize_t uv__fs_utime(uv_fs_t* req) {
     || defined(__NetBSD__)                                                    \
     || defined(__OpenBSD__)                                                   \
     || defined(__linux__)                                                     \
-    || defined(__sun)
+    || defined(__sun)                                                         \
+    || defined(__wasi__)
   struct timespec ts[2];
   ts[0] = uv__fs_to_timespec(req->atime);
   ts[1] = uv__fs_to_timespec(req->mtime);
@@ -1183,7 +1186,8 @@ static ssize_t uv__fs_lutime(uv_fs_t* req) {
     || defined(__NetBSD__)                                                    \
     || defined(__OpenBSD__)                                                   \
     || defined(__linux__)                                                     \
-    || defined(__sun)
+    || defined(__sun)                                                         \
+    || defined(__wasi__)
   struct timespec ts[2];
   ts[0] = uv__fs_to_timespec(req->atime);
   ts[1] = uv__fs_to_timespec(req->mtime);
