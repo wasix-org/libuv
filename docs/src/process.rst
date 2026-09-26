@@ -95,6 +95,11 @@ Data types
             UV_PROCESS_WINDOWS_FILE_PATH_EXACT_NAME = (1 << 7)
         };
 
+.. note::
+    On WASIX, ``UV_PROCESS_DETACHED`` is accepted but does not create a new
+    session or process group. Group signalling is not supported. Calling
+    :c:func:`uv_unref` on the process handle still releases its loop reference.
+
 .. c:type:: uv_stdio_container_t
 
     Container for each stdio handle or fd passed to a child process.

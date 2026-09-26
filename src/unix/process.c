@@ -876,10 +876,9 @@ static int uv__spawn_set_posix_spawn_attrs_wasi(
     goto error;
   }
 
-  if (options->flags & UV_PROCESS_DETACHED) {
-    err = ENOSYS;
-    goto error;
-  }
+  /* WASIX cannot create a new session or process group. Accept
+   * UV_PROCESS_DETACHED without changing the child's group membership.
+   */
 
   return 0;
 

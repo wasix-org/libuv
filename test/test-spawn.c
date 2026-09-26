@@ -280,12 +280,13 @@ TEST_IMPL(spawn_exit_code) {
 }
 
 
-TEST_IMPL(spawn_stdout) {
+static int spawn_stdout(unsigned int flags) {
   int r;
   uv_pipe_t out;
   uv_stdio_container_t stdio[2];
 
   init_process_options("spawn_helper2", exit_cb);
+  options.flags = flags;
 
   uv_pipe_init(uv_default_loop(), &out, 0);
   options.stdio = stdio;
@@ -310,6 +311,16 @@ TEST_IMPL(spawn_stdout) {
 
   MAKE_VALGRIND_HAPPY(uv_default_loop());
   return 0;
+}
+
+
+TEST_IMPL(spawn_stdout) {
+  return spawn_stdout(0);
+}
+
+
+TEST_IMPL(spawn_detached_stdout) {
+  return spawn_stdout(UV_PROCESS_DETACHED);
 }
 
 
