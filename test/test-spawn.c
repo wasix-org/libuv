@@ -658,6 +658,68 @@ TEST_IMPL(spawn_stdio_greater_than_3) {
 }
 
 
+#ifndef _WIN32
+TEST_IMPL(spawn_parent_pipe_fd_equals_child_target) {
+  const char expected[] = "parent-end-collision\n";
+  uv_stdio_container_t stdio[65];
+  uv_pipe_t pipe;
+  uv_os_fd_t parent_fd;
+  int fillers[64];
+  int filler_count;
+  int fd;
+  int i;
+  int r;
+
+  init_process_options("spawn_helper_parent_fd_target", exit_cb);
+  ASSERT_NOT_NULL(uv_default_loop());
+  ASSERT_OK(uv_pipe_init(uv_default_loop(), &pipe, 0));
+
+  /* Occupy every lower descriptor, then free 64. The new pipe's parent end
+   * must be 64, which is also the child target descriptor. */
+  for (filler_count = 0; filler_count < ARRAY_SIZE(fillers); filler_count++) {
+    fd = open("/dev/null", O_RDONLY);
+    ASSERT_GE(fd, 3);
+    if (fd == 64)
+      break;
+    ASSERT_LT(fd, 64);
+    fillers[filler_count] = fd;
+  }
+  ASSERT_EQ(64, fd);
+  ASSERT_OK(close(fd));
+
+  for (i = 0; i < ARRAY_SIZE(stdio); i++)
+    stdio[i].flags = UV_IGNORE;
+  for (i = 0; i < 3; i++) {
+    stdio[i].flags = UV_INHERIT_FD;
+    stdio[i].data.fd = i;
+  }
+  stdio[64].flags = UV_CREATE_PIPE | UV_WRITABLE_PIPE;
+  stdio[64].data.stream = (uv_stream_t*) &pipe;
+  options.stdio = stdio;
+  options.stdio_count = ARRAY_SIZE(stdio);
+
+  r = uv_spawn(uv_default_loop(), &process, &options);
+  ASSERT_OK(r);
+  ASSERT_OK(uv_fileno((uv_handle_t*) &pipe, &parent_fd));
+  ASSERT_EQ(64, (int) parent_fd);
+
+  for (i = 0; i < filler_count; i++)
+    ASSERT_OK(close(fillers[i]));
+
+  ASSERT_OK(uv_read_start((uv_stream_t*) &pipe, on_alloc, on_read));
+  ASSERT_OK(uv_run(uv_default_loop(), UV_RUN_DEFAULT));
+
+  ASSERT_EQ(1, exit_cb_called);
+  ASSERT_EQ(2, close_cb_called);
+  ASSERT_EQ(sizeof(expected) - 1, output_used);
+  ASSERT_OK(memcmp(expected, output, sizeof(expected) - 1));
+
+  MAKE_VALGRIND_HAPPY(uv_default_loop());
+  return 0;
+}
+#endif
+
+
 int spawn_tcp_server_helper(void) {
   uv_tcp_t tcp;
   uv_os_sock_t handle;

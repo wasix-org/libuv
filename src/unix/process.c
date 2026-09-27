@@ -933,6 +933,33 @@ static int uv__spawn_set_posix_spawn_file_actions_wasi(
 #endif
   }
 
+  /* Close parent-only pipe ends before installing child stdio targets. A parent
+   * end may have the same numeric fd as a target; closing it after dup2 would
+   * close the newly installed child channel instead. */
+  for (fd = 0; fd < stdio_count; fd++) {
+    use_fd = pipes[fd][0];
+    if (use_fd < 0)
+      continue;
+
+    for (fd2 = 0; fd2 < fd; fd2++) {
+      if (pipes[fd2][0] == use_fd)
+        break;
+    }
+    if (fd2 < fd)
+      continue;
+
+    for (fd2 = 0; fd2 < stdio_count; fd2++) {
+      if (pipes[fd2][1] == use_fd)
+        break;
+    }
+    if (fd2 < stdio_count)
+      continue;
+
+    err = posix_spawn_file_actions_addclose(actions, use_fd);
+    if (err != 0)
+      goto error;
+  }
+
   for (fd = 0; fd < stdio_count; fd++) {
     use_fd = pipes[fd][1];
 
@@ -978,30 +1005,6 @@ static int uv__spawn_set_posix_spawn_file_actions_wasi(
         break;
     }
     if (fd2 < fd)
-      continue;
-
-    err = posix_spawn_file_actions_addclose(actions, use_fd);
-    if (err != 0)
-      goto error;
-  }
-
-  for (fd = 0; fd < stdio_count; fd++) {
-    use_fd = pipes[fd][0];
-    if (use_fd < 0)
-      continue;
-
-    for (fd2 = 0; fd2 < fd; fd2++) {
-      if (pipes[fd2][0] == use_fd)
-        break;
-    }
-    if (fd2 < fd)
-      continue;
-
-    for (fd2 = 0; fd2 < stdio_count; fd2++) {
-      if (pipes[fd2][1] == use_fd)
-        break;
-    }
-    if (fd2 < stdio_count)
       continue;
 
     err = posix_spawn_file_actions_addclose(actions, use_fd);
