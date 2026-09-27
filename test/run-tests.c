@@ -188,7 +188,7 @@ static int maybe_run_test(int argc, char **argv) {
       written = write(64, out, sizeof(out) - 1);
     while (written == -1 && errno == EINTR);
 
-    return written == sizeof(out) - 1 ? 1 : 2;
+    return written == (ssize_t) (sizeof(out) - 1) ? 1 : 2;
   }
 #endif
 

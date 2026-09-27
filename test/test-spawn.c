@@ -676,7 +676,7 @@ TEST_IMPL(spawn_parent_pipe_fd_equals_child_target) {
 
   /* Occupy every lower descriptor, then free 64. The new pipe's parent end
    * must be 64, which is also the child target descriptor. */
-  for (filler_count = 0; filler_count < ARRAY_SIZE(fillers); filler_count++) {
+  for (filler_count = 0; filler_count < 64; filler_count++) {
     fd = open("/dev/null", O_RDONLY);
     ASSERT_GE(fd, 3);
     if (fd == 64)
@@ -687,7 +687,7 @@ TEST_IMPL(spawn_parent_pipe_fd_equals_child_target) {
   ASSERT_EQ(64, fd);
   ASSERT_OK(close(fd));
 
-  for (i = 0; i < ARRAY_SIZE(stdio); i++)
+  for (i = 0; i < 65; i++)
     stdio[i].flags = UV_IGNORE;
   for (i = 0; i < 3; i++) {
     stdio[i].flags = UV_INHERIT_FD;
