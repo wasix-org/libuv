@@ -178,6 +178,20 @@ static int maybe_run_test(int argc, char **argv) {
     return 1;
   }
 
+#ifndef _WIN32
+  if (strcmp(argv[1], "spawn_helper_parent_fd_target") == 0) {
+    const char out[] = "parent-end-collision\n";
+    ssize_t written;
+
+    notify_parent_process();
+    do
+      written = write(64, out, sizeof(out) - 1);
+    while (written == -1 && errno == EINTR);
+
+    return written == (ssize_t) (sizeof(out) - 1) ? 1 : 2;
+  }
+#endif
+
   if (strcmp(argv[1], "spawn_helper6") == 0) {
     int r;
 

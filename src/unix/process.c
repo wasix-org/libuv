@@ -985,30 +985,9 @@ static int uv__spawn_set_posix_spawn_file_actions_wasi(
       goto error;
   }
 
-  for (fd = 0; fd < stdio_count; fd++) {
-    use_fd = pipes[fd][0];
-    if (use_fd < 0)
-      continue;
-
-    for (fd2 = 0; fd2 < fd; fd2++) {
-      if (pipes[fd2][0] == use_fd)
-        break;
-    }
-    if (fd2 < fd)
-      continue;
-
-    for (fd2 = 0; fd2 < stdio_count; fd2++) {
-      if (pipes[fd2][1] == use_fd)
-        break;
-    }
-    if (fd2 < stdio_count)
-      continue;
-
-    err = posix_spawn_file_actions_addclose(actions, use_fd);
-    if (err != 0)
-      goto error;
-  }
-
+  /* Parent-only pipe ends are not closed here: they are created CLOEXEC, so
+   * the runtime drops them at exec. An explicit close would run after the
+   * dup2 actions above and could close a target that shares its number. */
   return 0;
 
 error:
