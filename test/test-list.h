@@ -323,6 +323,9 @@ TEST_DECLARE   (spawn_exit_code)
 TEST_DECLARE   (spawn_stdout)
 TEST_DECLARE   (spawn_stdin)
 TEST_DECLARE   (spawn_stdio_greater_than_3)
+#ifndef _WIN32
+TEST_DECLARE   (spawn_parent_pipe_fd_equals_child_target)
+#endif
 TEST_DECLARE   (spawn_ignored_stdio)
 TEST_DECLARE   (spawn_and_kill)
 TEST_DECLARE   (spawn_detached)
@@ -1007,6 +1010,9 @@ TASK_LIST_START
   TEST_ENTRY  (spawn_stdout)
   TEST_ENTRY  (spawn_stdin)
   TEST_ENTRY  (spawn_stdio_greater_than_3)
+#ifndef _WIN32
+  TEST_ENTRY  (spawn_parent_pipe_fd_equals_child_target)
+#endif
   TEST_ENTRY  (spawn_ignored_stdio)
   TEST_ENTRY  (spawn_and_kill)
   TEST_ENTRY  (spawn_detached)
